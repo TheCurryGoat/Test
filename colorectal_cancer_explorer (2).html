@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Colorectal Cancer: Incidence & Demographics</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Instrument+Sans:wght@300;400;600&display=swap');
+
+  :root {
+    --bg: #0a0c0f;
+    --surface: #111318;
+    --surface2: #181c23;
+    --border: #1e2530;
+    --accent: #e8472a;
+    --accent2: #f5a623;
+    --accent3: #4a9eff;
+    --accent4: #7ed4a4;
+    --text: #e8e4dc;
+    --text-dim: #7a7f8a;
+    --text-muted: #3a3f4a;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Instrument Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  header {
+    position: relative;
+    z-index: 10;
+    padding: 48px 60px 36px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: flex-end;
+    gap: 40px;
+  }
+
+  .header-left { flex: 1; }
+
+  .eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: clamp(32px, 4vw, 54px);
+    line-height: 1.05;
+    color: var(--text);
+    letter-spacing: -0.02em;
+  }
+
+  h1 em {
+    font-style: italic;
+    color: var(--accent2);
+  }
+
+  .header-stats {
+    display: flex;
+    gap: 32px;
+    flex-shrink: 0;
+  }
+
+  .stat-pill {
+    text-align: right;
+    border-left: 1px solid var(--border);
+    padding-left: 24px;
+  }
+
+  .stat-pill .num {
+    font-family: 'DM Serif Display', serif;
+    font-size: 28px;
+    color: var(--accent);
+    display: block;
+    line-height: 1;
+  }
+
+  .stat-pill .label {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  /* Nav tabs */
+  nav {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    gap: 0;
+    padding: 0 60px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  .tab {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    padding: 16px 24px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+  }
+
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  main {
+    position: relative;
+    z-index: 1;
+    padding: 40px 60px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* Knowledge Map */
+  #map-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  #map-container svg { display: block; width: 100%; height: 100%; }
+
+  .map-legend {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    background: rgba(10,12,15,0.85);
+    border: 1px solid var(--border);
+    padding: 14px 18px;
+    border-radius: 4px;
+    backdrop-filter: blur(8px);
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+  .legend-item:last-child { margin-bottom: 0; }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* Charts grid */
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 28px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .chart-card.wide { grid-column: span 2; }
+
+  .chart-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+  }
+
+  .chart-card.blue::before { background: linear-gradient(90deg, var(--accent3), transparent); }
+  .chart-card.green::before { background: linear-gradient(90deg, var(--accent4), transparent); }
+  .chart-card.amber::before { background: linear-gradient(90deg, var(--accent2), transparent); }
+
+  .chart-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+
+  .chart-heading {
+    font-family: 'DM Serif Display', serif;
+    font-size: 20px;
+    color: var(--text);
+    margin-bottom: 20px;
+    line-height: 1.2;
+  }
+
+  /* Bar chart */
+  .bar-chart { display: flex; flex-direction: column; gap: 10px; }
+
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .bar-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    min-width: 110px;
+    text-align: right;
+  }
+
+  .bar-track {
+    flex: 1;
+    height: 22px;
+    background: var(--surface2);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 1s cubic-bezier(0.4,0,0.2,1);
+    position: relative;
+  }
+
+  .bar-value {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+    min-width: 60px;
+  }
+
+  /* Trend line SVG */
+  .trend-svg { width: 100%; }
+
+  /* Tooltip */
+  .tooltip {
+    position: fixed;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 10px 14px;
+    border-radius: 4px;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 1000;
+    max-width: 220px;
+    line-height: 1.6;
+  }
+
+  .tooltip.show { opacity: 1; }
+  .tooltip strong { color: var(--accent2); display: block; margin-bottom: 2px; }
+
+  /* Risk factors section */
+  .risk-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-top: 8px;
+  }
+
+  .risk-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 18px;
+    position: relative;
+    cursor: default;
+    transition: border-color 0.2s;
+  }
+
+  .risk-card:hover { border-color: var(--accent2); }
+
+  .risk-level {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .level-high { color: var(--accent); }
+  .level-mod { color: var(--accent2); }
+  .level-low { color: var(--accent4); }
+
+  .risk-name {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16px;
+    color: var(--text);
+    margin-bottom: 6px;
+    line-height: 1.2;
+  }
+
+  .risk-desc {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
+  /* Timeline */
+  .timeline {
+    position: relative;
+    padding-left: 28px;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 8px; bottom: 8px;
+    width: 1px;
+    background: var(--border);
+  }
+
+  .tl-item {
+    position: relative;
+    padding-bottom: 28px;
+  }
+
+  .tl-item::before {
+    content: '';
+    position: absolute;
+    left: -32px;
+    top: 6px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--bg);
+  }
+
+  .tl-year {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+    margin-bottom: 4px;
+  }
+
+  .tl-text {
+    font-size: 13px;
+    color: var(--text-dim);
+    line-height: 1.5;
+  }
+
+  .tl-text strong { color: var(--text); font-weight: 600; }
+
+  /* Screening section */
+  .screening-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .screening-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px;
+  }
+
+  .screening-item .test-name {
+    font-family: 'DM Serif Display', serif;
+    font-size: 17px;
+    margin-bottom: 4px;
+  }
+
+  .screening-item .meta {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-bottom: 10px;
+    letter-spacing: 0.08em;
+  }
+
+  .screening-item .desc { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+
+  /* donut */
+  #donut-container { display: flex; align-items: center; gap: 32px; }
+  #donut-container svg { flex-shrink: 0; }
+  .donut-legend { flex: 1; }
+  .donut-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+  .donut-legend-item .swatch {
+    width: 12px; height: 12px; border-radius: 2px; flex-shrink: 0;
+  }
+  .donut-legend-item .pct {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    color: var(--text);
+    margin-left: auto;
+  }
+
+  /* Animate bars on load */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .chart-card { animation: fadeUp 0.5s ease both; }
+  .chart-card:nth-child(2) { animation-delay: 0.08s; }
+  .chart-card:nth-child(3) { animation-delay: 0.16s; }
+  .chart-card:nth-child(4) { animation-delay: 0.24s; }
+  .chart-card:nth-child(5) { animation-delay: 0.32s; }
+
+  .source-note {
+    margin-top: 32px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    line-height: 1.7;
+    letter-spacing: 0.05em;
+  }
+
+  /* Node tooltip */
+  .node-tooltip {
+    position: fixed;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 12px 16px;
+    border-radius: 4px;
+    pointer-events: none;
+    z-index: 1000;
+    max-width: 240px;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .node-tooltip.show { opacity: 1; }
+  .node-tooltip .nt-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 15px;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .node-tooltip .nt-body {
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.55;
+    font-family: 'Instrument Sans', sans-serif;
+  }
+
+  .section-intro {
+    font-size: 14px;
+    color: var(--text-dim);
+    line-height: 1.65;
+    max-width: 680px;
+    margin-bottom: 28px;
+  }
+
+  @media (max-width: 900px) {
+    header { padding: 28px 24px 24px; flex-direction: column; align-items: flex-start; gap: 20px; }
+    nav { padding: 0 24px; overflow-x: auto; }
+    main { padding: 24px; }
+    .charts-grid { grid-template-columns: 1fr; }
+    .chart-card.wide { grid-column: span 1; }
+    .risk-grid { grid-template-columns: 1fr; }
+    .screening-grid { grid-template-columns: 1fr; }
+    .header-stats { flex-direction: row; flex-wrap: wrap; gap: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="tooltip" id="tooltip"></div>
+<div class="node-tooltip" id="nodeTooltip"></div>
+
+<header>
+  <div class="header-left">
+    <div class="eyebrow">Knowledge Map · Epidemiology</div>
+    <h1>Colorectal Cancer<br><em>Incidence & Demographics</em></h1>
+  </div>
+  <div class="header-stats">
+    <div class="stat-pill">
+      <span class="num">153K</span>
+      <span class="label">New US cases/yr</span>
+    </div>
+    <div class="stat-pill">
+      <span class="num">#3</span>
+      <span class="label">Cancer by incidence</span>
+    </div>
+    <div class="stat-pill">
+      <span class="num">57K</span>
+      <span class="label">Deaths/yr (US)</span>
+    </div>
+  </div>
+</header>
+
+<nav>
+  <button class="tab active" onclick="switchTab('map')">Knowledge Map</button>
+  <button class="tab" onclick="switchTab('demographics')">Demographics</button>
+  <button class="tab" onclick="switchTab('trends')">Trends</button>
+  <button class="tab" onclick="switchTab('risk')">Risk Factors</button>
+  <button class="tab" onclick="switchTab('screening')">Screening</button>
+</nav>
+
+<main>
+
+  <!-- KNOWLEDGE MAP TAB -->
+  <div class="panel active" id="panel-map">
+    <p class="section-intro">An interactive concept map of colorectal cancer epidemiology. Hover nodes for details. Drag to explore connections between incidence patterns, demographic drivers, risk factors, and prevention strategies.</p>
+    <div id="map-container" style="height: 500px; min-height: 500px;">
+      <svg id="knowledge-svg"></svg>
+      <div class="map-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#e8472a"></div>Core Concept</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#f5a623"></div>Demographics</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#4a9eff"></div>Risk Factors</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#7ed4a4"></div>Prevention</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#c084fc"></div>Pathophysiology</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DEMOGRAPHICS TAB -->
+  <div class="panel" id="panel-demographics">
+    <p class="section-intro">Incidence and mortality vary significantly across age, race/ethnicity, sex, and geography. Early-onset CRC (under 50) is rising while rates in older adults decline — a reversal driven by lifestyle and environmental changes.</p>
+    <div class="charts-grid">
+
+      <div class="chart-card">
+        <div class="chart-title">Incidence Rate per 100,000</div>
+        <div class="chart-heading">By Race & Ethnicity</div>
+        <div class="bar-chart" id="race-bars"></div>
+      </div>
+
+      <div class="chart-card blue">
+        <div class="chart-title">Age-Adjusted Rate per 100,000</div>
+        <div class="chart-heading">Male vs. Female</div>
+        <div class="bar-chart" id="sex-bars"></div>
+      </div>
+
+      <div class="chart-card amber wide">
+        <div class="chart-title">Incidence by Age Group (US, per 100,000)</div>
+        <div class="chart-heading">Age Distribution of Colorectal Cancer</div>
+        <svg id="age-chart" height="200"></svg>
+      </div>
+
+      <div class="chart-card green">
+        <div class="chart-title">Geographic Variation</div>
+        <div class="chart-heading">US Regions — Incidence Rate</div>
+        <div class="bar-chart" id="geo-bars"></div>
+      </div>
+
+      <div class="chart-card blue">
+        <div class="chart-title">Stage at Diagnosis (%)</div>
+        <div class="chart-heading">Distribution by Stage</div>
+        <div id="donut-container">
+          <svg id="donut-svg" width="150" height="150"></svg>
+          <div class="donut-legend" id="donut-legend"></div>
+        </div>
+      </div>
+
+    </div>
+    <div class="source-note">
+      Sources: SEER Cancer Statistics Review (2017–2021); American Cancer Society Cancer Facts & Figures 2024; MMWR 2023 — Early-onset CRC surveillance data.
+    </div>
+  </div>
+
+  <!-- TRENDS TAB -->
+  <div class="panel" id="panel-trends">
+    <p class="section-intro">Overall CRC rates have declined ~1% annually since the 1980s due to colonoscopy screening. However, early-onset CRC (under 50) has increased ~2% per year since the mid-1990s — a public health paradox demanding attention.</p>
+    <div class="charts-grid">
+      <div class="chart-card wide">
+        <div class="chart-title">Long-Term Trend (Age-Standardized Rate per 100,000)</div>
+        <div class="chart-heading">Overall Incidence — 1975 to 2022</div>
+        <svg id="trend-chart" height="260" style="width:100%"></svg>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Early-Onset CRC — Under 50</div>
+        <div class="chart-heading">Rising Incidence Since 1995</div>
+        <svg id="early-onset-chart" height="220" style="width:100%"></svg>
+      </div>
+      <div class="chart-card amber">
+        <div class="chart-title">5-Year Relative Survival (%)</div>
+        <div class="chart-heading">Survival Trends by Decade</div>
+        <div class="bar-chart" id="survival-bars"></div>
+      </div>
+    </div>
+    <div class="source-note">Sources: NCI SEER Database; CA: A Cancer Journal for Clinicians 2024; Siegel et al. 2023.</div>
+  </div>
+
+  <!-- RISK FACTORS TAB -->
+  <div class="panel" id="panel-risk">
+    <p class="section-intro">Risk factors span modifiable lifestyle factors, hereditary syndromes, and environmental exposures. Understanding relative risk helps target screening and preventive interventions to highest-risk populations.</p>
+    <div class="risk-grid">
+      <div class="risk-card">
+        <div class="risk-level level-high">High Risk · Hereditary</div>
+        <div class="risk-name">Lynch Syndrome (HNPCC)</div>
+        <div class="risk-desc">Autosomal dominant; MLH1, MSH2, MSH6, PMS2 mutations. Lifetime CRC risk 40–80%. Accounts for ~3% of all CRC.</div>
+      </div>
+      <div class="risk-card">
+        <div class="risk-level level-high">High Risk · Hereditary</div>
+        <div class="risk-name">Familial Adenomatous Polyposis (FAP)</div>
+        <div class="risk-desc">APC gene mutation. Hundreds to thousands of polyps. Nearly 100% lifetime risk without colectomy.</div>
+      </div>
+      <div class="risk-card">
+        <div class="risk-level level-high">High Risk · Disease History</div>
+        <div class="risk-name">Inflammatory Bowel Disease</div>
+        <div class="risk-desc">Ulcerative colitis and Crohn's colitis increase CRC risk 2–8× depending on extent and duration of disease.</div>
+      </div>
+      <div class="risk-card">
+        <div class="risk-level level-mod">Moderate Risk · Lifestyle</div>
+        <div class="risk-name">Obesity & Physical Inactivity</div>
+        <div class="risk-desc">BMI ≥30 associated with RR ~1.3–1.5. Sedentary lifestyle adds independent risk; especially for colon cancer.</div>
+      </div>
+      <div class="risk-card">
+        <div class="risk-level level-mod">Moderate Risk · Diet</div>
+        <div class="risk-name">Red & Processed Meat</div>
+        <div class="risk-desc">IARC Group 1 carcinogen (processed meat). Each 50g/day processed meat ↑ risk ~18%. N-nitroso compounds, heme iron mechanisms.</div>
+      </div>
+      <div class="risk-card">
+        <div class="risk-level level-mod">Moderate Risk · Lifestyle</div>
+        <div class="risk-name">Alcohol & Tobacco</div>
+        <div class="risk-desc">Heavy alcohol (≥4 drinks/day) RR ~1.5. Smoking increases risk after 30–40 year latency; particularly rectal cancer.</div>
+      </div>
+      <div class="risk-card">
+        <div class="risk-level level-mod">Moderate Risk · Metabolic</div>
+        <div class="risk-name">Type 2 Diabetes</div>
+        <div class="risk-desc">Hyperinsulinemia and insulin-like growth factors promote adenoma and CRC development; RR ~1.3–1.5.</div>
+      </div>
+      <div class="risk-card">
+        <div class="risk-level level-low">Emerging · Microbiome</div>
+        <div class="risk-name">Gut Microbiome Dysbiosis</div>
+        <div class="risk-desc">Fusobacterium nucleatum enriched in CRC tumors. Altered microbial metabolites (bile acids, SCFAs) implicated in carcinogenesis.</div>
+      </div>
+      <div class="risk-card">
+        <div class="risk-level level-low">Emerging · Early-Onset</div>
+        <div class="risk-name">Antibiotic Use & Western Diet</div>
+        <div class="risk-desc">Childhood antibiotic exposure and ultra-processed food consumption hypothesized as drivers of rising early-onset CRC rates.</div>
+      </div>
+    </div>
+    <div class="source-note">Sources: ACS Guidelines 2024; IARC Monographs Vol. 114; Sung et al., Gastroenterology 2021; Brenner et al., Lancet 2014.</div>
+  </div>
+
+  <!-- SCREENING TAB -->
+  <div class="panel" id="panel-screening">
+    <p class="section-intro">Screening is the single most effective intervention for reducing CRC mortality — it can prevent cancer by removing precancerous polyps. USPSTF now recommends beginning at age 45 for average-risk adults.</p>
+    <div class="charts-grid">
+      <div class="chart-card wide">
+        <div class="chart-title">Screening Uptake by Group</div>
+        <div class="chart-heading">% Adults Up-to-Date with CRC Screening (2021, NHIS)</div>
+        <div class="bar-chart" id="screening-bars"></div>
+      </div>
+    </div>
+    <br>
+    <div class="screening-grid">
+      <div class="screening-item">
+        <div class="test-name">Colonoscopy</div>
+        <div class="meta">Every 10 years · Sensitivity ~95% (large polyps)</div>
+        <div class="desc">Gold standard. Both diagnostic and therapeutic — polyps removed during procedure. Requires bowel prep and sedation. Low adherence but high efficacy per test.</div>
+      </div>
+      <div class="screening-item">
+        <div class="test-name">FIT (Fecal Immunochemical Test)</div>
+        <div class="meta">Annual · Sensitivity ~79% for CRC</div>
+        <div class="desc">Non-invasive stool test detecting blood. High adherence, no bowel prep. Requires annual compliance and colonoscopy follow-up if positive.</div>
+      </div>
+      <div class="screening-item">
+        <div class="test-name">Cologuard (mt-sDNA)</div>
+        <div class="meta">Every 1–3 years · Sensitivity ~92% for CRC</div>
+        <div class="desc">Stool DNA test detecting cancer-associated mutations + hemoglobin. Higher sensitivity than FIT but lower specificity (higher false positives).</div>
+      </div>
+      <div class="screening-item">
+        <div class="test-name">CT Colonography</div>
+        <div class="meta">Every 5 years · Sensitivity ~96% (≥10mm polyps)</div>
+        <div class="desc">Virtual colonoscopy using CT imaging. No sedation required. Requires bowel prep. Cannot remove polyps — follow-up colonoscopy needed.</div>
+      </div>
+    </div>
+
+    <br>
+    <div class="chart-card" style="border-top: 2px solid var(--accent4);">
+      <div class="chart-title">Key Policy Milestones</div>
+      <div class="chart-heading" style="margin-bottom:24px">Screening Guidelines Timeline</div>
+      <div class="timeline">
+        <div class="tl-item">
+          <div class="tl-year">1997</div>
+          <div class="tl-text"><strong>USPSTF first recommended CRC screening</strong> for average-risk adults beginning at age 50.</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-year">2008</div>
+          <div class="tl-text"><strong>Colonoscopy formally endorsed</strong> alongside stool-based tests. Medicare coverage expanded.</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-year">2016</div>
+          <div class="tl-text"><strong>Cologuard FDA-approved</strong> as the first stool DNA test. Covered by Medicare for average-risk adults.</div>
+        </div>
+        <div class="tl-item">
+          <div class="tl-year">2021</div>
+          <div class="tl-text"><strong>USPSTF lowered screening age to 45</strong> for average-risk adults — a major policy shift in response to rising early-onset CRC rates.</div>
+        </div>
+        <div class="tl-item" style="padding-bottom:0">
+          <div class="tl-year">2023–Present</div>
+          <div class="tl-text"><strong>Equity-focused initiatives</strong> to close the gap in screening uptake among Black Americans, Hispanic populations, and uninsured adults. Navigator programs expanding.</div>
+        </div>
+      </div>
+    </div>
+    <div class="source-note">Sources: USPSTF 2021 Guidelines; NHIS 2021 CRC Screening Data; ACG Clinical Guidelines 2021; NCI Cancer Trends Progress Report.</div>
+  </div>
+
+</main>
+
+<script>
+// ── DATA ─────────────────────────────────────────────────────────────────────
+
+const raceData = [
+  { label: "Black/African Am.", rate: 45.7, color: "#e8472a" },
+  { label: "White", rate: 38.6, color: "#f5a623" },
+  { label: "American Indian/AK", rate: 42.1, color: "#c084fc" },
+  { label: "Hispanic/Latino", rate: 32.9, color: "#4a9eff" },
+  { label: "Asian/Pac. Islander", rate: 28.4, color: "#7ed4a4" },
+];
+
+const sexData = [
+  { label: "Male — Colon", rate: 43.7, color: "#4a9eff" },
+  { label: "Female — Colon", rate: 32.8, color: "#7ed4a4" },
+  { label: "Male — Rectal", rate: 17.2, color: "#4a9eff", lighter: true },
+  { label: "Female — Rectal", rate: 9.8, color: "#7ed4a4", lighter: true },
+];
+
+const geoData = [
+  { label: "Appalachia Region", rate: 47.2, color: "#e8472a" },
+  { label: "Deep South", rate: 43.8, color: "#f5a623" },
+  { label: "Midwest", rate: 38.1, color: "#c084fc" },
+  { label: "Northeast", rate: 36.5, color: "#4a9eff" },
+  { label: "West", rate: 31.2, color: "#7ed4a4" },
+];
+
+const ageData = [
+  { group: "<40", rate: 3.2 },
+  { group: "40–44", rate: 12.1 },
+  { group: "45–49", rate: 21.4 },
+  { group: "50–54", rate: 37.6 },
+  { group: "55–59", rate: 62.3 },
+  { group: "60–64", rate: 98.7 },
+  { group: "65–69", rate: 142.1 },
+  { group: "70–74", rate: 185.4 },
+  { group: "75–79", rate: 218.9 },
+  { group: "80+", rate: 264.2 },
+];
+
+const stageData = [
+  { label: "Localized", pct: 36, color: "#7ed4a4" },
+  { label: "Regional", pct: 35, color: "#f5a623" },
+  { label: "Distant", pct: 23, color: "#e8472a" },
+  { label: "Unknown", pct: 6, color: "#3a3f4a" },
+];
+
+const trendData = [
+  {yr:1975, rate:60}, {yr:1980, rate:59}, {yr:1985, rate:57},
+  {yr:1990, rate:54}, {yr:1995, rate:49}, {yr:2000, rate:45},
+  {yr:2005, rate:42}, {yr:2010, rate:38}, {yr:2015, rate:36},
+  {yr:2019, rate:35}, {yr:2022, rate:33.5},
+];
+
+const earlyOnsetData = [
+  {yr:1995, rate:8.6}, {yr:1998, rate:8.9}, {yr:2001, rate:9.4},
+  {yr:2004, rate:10.1}, {yr:2007, rate:10.9}, {yr:2010, rate:11.7},
+  {yr:2013, rate:12.8}, {yr:2016, rate:13.9}, {yr:2019, rate:14.8},
+  {yr:2022, rate:15.9},
+];
+
+const survivalData = [
+  { label: "1975–1977", rate: 51, color: "#e8472a" },
+  { label: "1985–1987", rate: 58, color: "#f5a623" },
+  { label: "1995–1997", rate: 62, color: "#c084fc" },
+  { label: "2005–2007", rate: 65, color: "#4a9eff" },
+  { label: "2015–2021", rate: 65.3, color: "#7ed4a4" },
+];
+
+const screeningUptake = [
+  { label: "White (non-Hispanic)", rate: 71.8, color: "#4a9eff" },
+  { label: "Black/African Am.", rate: 67.2, color: "#e8472a" },
+  { label: "Hispanic/Latino", rate: 58.4, color: "#f5a623" },
+  { label: "Asian American", rate: 62.1, color: "#c084fc" },
+  { label: "Uninsured Adults", rate: 29.7, color: "#7a7f8a" },
+  { label: "Age 45–49 (new rec.)", rate: 38.2, color: "#7ed4a4" },
+];
+
+// ── KNOWLEDGE MAP (D3 Force) ─────────────────────────────────────────────────
+const nodes = [
+  { id: "CRC", label: "Colorectal\nCancer", group: "core", info: "3rd most common cancer in the US. ~153,000 new cases/year. Incidence varies dramatically by age, race, sex, and geography.", r: 36 },
+  { id: "age", label: "Age", group: "demo", info: "Risk rises sharply after 45. Median age at diagnosis: 66. Early-onset CRC (under 50) rising ~2%/year since 1995.", r: 22 },
+  { id: "race", label: "Race &\nEthnicity", group: "demo", info: "Black Americans have highest incidence (45.7/100K) and mortality. Asian Americans lowest. Disparities driven by access, biology, and screening rates.", r: 22 },
+  { id: "sex", label: "Sex", group: "demo", info: "Males have ~25% higher incidence than females. Hormonal factors (estrogen) may be protective in premenopausal women.", r: 18 },
+  { id: "geo", label: "Geography", group: "demo", info: "Appalachia and Deep South have highest rates. Rural areas have less screening access. Rural-urban mortality gap is widening.", r: 18 },
+  { id: "genetics", label: "Hereditary\nSyndromes", group: "risk", info: "Lynch syndrome (3%) and FAP (<1%) account for a minority but have near-certain lifetime risk. Genetic counseling crucial.", r: 22 },
+  { id: "ibd", label: "IBD", group: "risk", info: "Ulcerative colitis and Crohn's disease increase CRC risk 2–8×. Chronic inflammation drives mucosal dysplasia.", r: 16 },
+  { id: "diet", label: "Diet &\nObesity", group: "risk", info: "Processed/red meat, obesity, alcohol, and low fiber all independently increase risk. Western diet pattern most implicated.", r: 20 },
+  { id: "microbiome", label: "Gut\nMicrobiome", group: "risk", info: "Fusobacterium nucleatum and altered bile acid metabolism are strongly implicated. Microbiome dysbiosis may explain early-onset rise.", r: 16 },
+  { id: "screening", label: "Screening &\nPrevention", group: "prev", info: "Colonoscopy can prevent CRC by removing adenomatous polyps. USPSTF lowered age to 45 in 2021. Significant disparities in uptake persist.", r: 22 },
+  { id: "aspirin", label: "Chemoprevention", group: "prev", info: "Long-term aspirin/NSAID use reduces adenoma and CRC risk. Not universally recommended due to bleeding risk.", r: 16 },
+  { id: "early", label: "Early-Onset\nCRC", group: "core", info: "CRC in adults under 50 rising significantly. Often diagnosed at later stage. No clear single cause — diet, microbiome, antibiotics hypothesized.", r: 20 },
+  { id: "path", label: "Adenoma–\nCarcinoma", group: "path", info: "~80% of CRCs arise from adenomatous polyps via chromosomal instability. ~15–20% via microsatellite instability (serrated) pathway.", r: 18 },
+  { id: "disparity", label: "Health\nDisparities", group: "demo", info: "Black Americans face 20% higher mortality. Screening gaps, delayed diagnosis, differential treatment quality all contribute.", r: 18 },
+];
+
+const links = [
+  { source: "age", target: "CRC" }, { source: "race", target: "CRC" },
+  { source: "sex", target: "CRC" }, { source: "geo", target: "CRC" },
+  { source: "genetics", target: "CRC" }, { source: "ibd", target: "CRC" },
+  { source: "diet", target: "CRC" }, { source: "microbiome", target: "diet" },
+  { source: "microbiome", target: "early" }, { source: "screening", target: "CRC" },
+  { source: "aspirin", target: "screening" }, { source: "early", target: "CRC" },
+  { source: "path", target: "CRC" }, { source: "genetics", target: "path" },
+  { source: "ibd", target: "path" }, { source: "disparity", target: "race" },
+  { source: "disparity", target: "screening" }, { source: "geo", target: "disparity" },
+  { source: "diet", target: "early" }, { source: "age", target: "early" },
+];
+
+const groupColor = {
+  core: "#e8472a", demo: "#f5a623", risk: "#4a9eff", prev: "#7ed4a4", path: "#c084fc"
+};
+
+function initKnowledgeMap() {
+  const W = 900, H = 500;
+  const svg = d3.select("#knowledge-svg")
+    .attr("viewBox", `0 0 ${W} ${H}`)
+    .attr("preserveAspectRatio", "xMidYMid meet")
+    .style("width", "100%")
+    .style("height", "100%");
+
+  svg.append("defs").append("marker")
+    .attr("id", "arrow")
+    .attr("viewBox", "0 -4 8 8")
+    .attr("refX", 22).attr("refY", 0)
+    .attr("markerWidth", 6).attr("markerHeight", 6)
+    .attr("orient", "auto")
+    .append("path").attr("d", "M0,-4L8,0L0,4").attr("fill", "#2e3540");
+
+  // Deep-copy nodes/links so simulation doesn't mutate the originals on re-init
+  const simNodes = nodes.map(d => ({...d}));
+  const simLinks = links.map(d => ({...d}));
+
+  const sim = d3.forceSimulation(simNodes)
+    .force("link", d3.forceLink(simLinks).id(d => d.id).distance(95).strength(0.5))
+    .force("charge", d3.forceManyBody().strength(-350))
+    .force("center", d3.forceCenter(W/2, H/2))
+    .force("collision", d3.forceCollide(d => d.r + 16))
+    .force("x", d3.forceX(W/2).strength(0.04))
+    .force("y", d3.forceY(H/2).strength(0.04));
+
+  const link = svg.append("g").selectAll("line")
+    .data(simLinks).join("line")
+    .attr("stroke", "#2e3540").attr("stroke-width", 1.5)
+    .attr("marker-end", "url(#arrow)");
+
+  const node = svg.append("g").selectAll("g")
+    .data(simNodes).join("g")
+    .attr("cursor", "grab")
+    .call(d3.drag()
+      .on("start", (e, d) => { if (!e.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+      .on("drag", (e, d) => { d.fx = e.x; d.fy = e.y; })
+      .on("end", (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = null; d.fy = null; })
+    );
+
+  node.append("circle")
+    .attr("r", d => d.r)
+    .attr("fill", d => groupColor[d.group] + "22")
+    .attr("stroke", d => groupColor[d.group])
+    .attr("stroke-width", 1.5);
+
+  node.append("text")
+    .attr("text-anchor", "middle")
+    .attr("dominant-baseline", "middle")
+    .attr("fill", d => groupColor[d.group])
+    .attr("font-size", d => d.r > 25 ? 11 : 9)
+    .attr("font-family", "'DM Mono', monospace")
+    .attr("pointer-events", "none")
+    .each(function(d) {
+      const lines = d.label.split("\n");
+      const el = d3.select(this);
+      if (lines.length === 1) {
+        el.text(lines[0]);
+      } else {
+        lines.forEach((l, i) => {
+          el.append("tspan")
+            .attr("x", 0)
+            .attr("dy", i === 0 ? `${-(lines.length-1)*0.55}em` : "1.1em")
+            .text(l);
+        });
+      }
+    });
+
+  const nt = document.getElementById("nodeTooltip");
+  node.on("mouseenter", (e, d) => {
+    nt.innerHTML = `<div class="nt-title">${d.label.replace("\n"," ")}</div><div class="nt-body">${d.info}</div>`;
+    nt.classList.add("show");
+  }).on("mousemove", e => {
+    nt.style.left = (e.clientX + 12) + "px";
+    nt.style.top = (e.clientY - 10) + "px";
+  }).on("mouseleave", () => nt.classList.remove("show"));
+
+  sim.on("tick", () => {
+    link
+      .attr("x1", d => d.source.x).attr("y1", d => d.source.y)
+      .attr("x2", d => d.target.x).attr("y2", d => d.target.y);
+    node.attr("transform", d => `translate(${Math.max(d.r, Math.min(W-d.r, d.x))},${Math.max(d.r, Math.min(H-d.r, d.y))})`);
+  });
+}
+
+// ── BAR CHART HELPER ─────────────────────────────────────────────────────────
+function renderBars(containerId, data, maxVal) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const max = maxVal || Math.max(...data.map(d => d.rate));
+  el.innerHTML = data.map(d => `
+    <div class="bar-row">
+      <span class="bar-label">${d.label}</span>
+      <div class="bar-track">
+        <div class="bar-fill" style="width:0%; background:${d.color}${d.lighter?'88':''};"
+          data-target="${(d.rate/max*100).toFixed(1)}"></div>
+      </div>
+      <span class="bar-value">${d.rate}</span>
+    </div>
+  `).join('');
+
+  setTimeout(() => {
+    el.querySelectorAll('.bar-fill').forEach(b => {
+      b.style.width = b.dataset.target + '%';
+    });
+  }, 100);
+}
+
+// ── AGE CHART (SVG bar) ─────────────────────────────────────────────────────
+function renderAgeChart() {
+  const svg = document.getElementById("age-chart");
+  if (!svg) return;
+  const W = svg.parentElement.clientWidth - 56;
+  svg.setAttribute("width", W);
+  const H = 200, pad = { t: 10, r: 20, b: 40, l: 50 };
+  const iW = W - pad.l - pad.r, iH = H - pad.t - pad.b;
+  const max = Math.max(...ageData.map(d => d.rate));
+  const barW = iW / ageData.length;
+  const colors = d3.scaleSequential(d3.interpolateRgb("#4a9eff44", "#e8472a")).domain([0, ageData.length-1]);
+
+  let svgHtml = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="'DM Mono',monospace">`;
+
+  // Y axis
+  [0,50,100,150,200,264].forEach(v => {
+    const y = pad.t + iH - (v/max*iH);
+    svgHtml += `<line x1="${pad.l}" x2="${W-pad.r}" y1="${y}" y2="${y}" stroke="#1e2530" stroke-width="1"/>`;
+    svgHtml += `<text x="${pad.l-6}" y="${y+4}" fill="#3a3f4a" font-size="9" text-anchor="end">${v}</text>`;
+  });
+
+  ageData.forEach((d, i) => {
+    const bh = (d.rate / max) * iH;
+    const x = pad.l + i * barW + 2;
+    const y = pad.t + iH - bh;
+    const c = colors(i);
+    svgHtml += `<rect x="${x}" y="${y}" width="${barW-4}" height="${bh}" fill="${c}" rx="2"/>`;
+    svgHtml += `<text x="${x + barW/2 - 2}" y="${H - pad.b + 14}" fill="#7a7f8a" font-size="9" text-anchor="middle">${d.group}</text>`;
+  });
+
+  svgHtml += `</svg>`;
+  svg.outerHTML = svgHtml;
+}
+
+// ── DONUT CHART ─────────────────────────────────────────────────────────────
+function renderDonut() {
+  const svg = d3.select("#donut-svg");
+  const W = 150, H = 150, R = 56, ir = 34;
+  const arc = d3.arc().innerRadius(ir).outerRadius(R);
+  const pie = d3.pie().value(d => d.pct).sort(null);
+  const g = svg.append("g").attr("transform", `translate(${W/2},${H/2})`);
+
+  g.selectAll("path").data(pie(stageData)).join("path")
+    .attr("d", arc)
+    .attr("fill", d => d.data.color)
+    .attr("stroke", "#0a0c0f")
+    .attr("stroke-width", 2);
+
+  const legend = document.getElementById("donut-legend");
+  legend.innerHTML = stageData.map(d => `
+    <div class="donut-legend-item">
+      <div class="swatch" style="background:${d.color}"></div>
+      <span>${d.label}</span>
+      <span class="pct">${d.pct}%</span>
+    </div>
+  `).join('');
+}
+
+// ── TREND CHART ─────────────────────────────────────────────────────────────
+function renderTrendChart() {
+  const el = document.getElementById("trend-chart");
+  if (!el) return;
+  const W = el.parentElement.clientWidth - 56;
+  el.setAttribute("width", W);
+  const H = 260, pad = { t: 20, r: 30, b: 36, l: 50 };
+  const iW = W - pad.l - pad.r, iH = H - pad.t - pad.b;
+
+  const xScale = d3.scaleLinear().domain([1975, 2022]).range([0, iW]);
+  const yScale = d3.scaleLinear().domain([25, 65]).range([iH, 0]);
+  const line = d3.line().x(d => xScale(d.yr)).y(d => yScale(d.rate)).curve(d3.curveCatmullRom);
+
+  const svg2 = d3.select(el);
+  const g = svg2.append("g").attr("transform", `translate(${pad.l},${pad.t})`);
+
+  [30,40,50,60].forEach(v => {
+    const y = yScale(v);
+    g.append("line").attr("x1",0).attr("x2",iW).attr("y1",y).attr("y2",y)
+      .attr("stroke","#1e2530").attr("stroke-width",1);
+    g.append("text").attr("x",-8).attr("y",y+4).attr("fill","#3a3f4a")
+      .attr("font-size",10).attr("text-anchor","end").attr("font-family","'DM Mono',monospace").text(v);
+  });
+
+  [1980,1990,2000,2010,2020].forEach(yr => {
+    const x = xScale(yr);
+    g.append("text").attr("x",x).attr("y",iH+18).attr("fill","#3a3f4a")
+      .attr("font-size",10).attr("text-anchor","middle").attr("font-family","'DM Mono',monospace").text(yr);
+  });
+
+  // Gradient area
+  const defs = svg2.append("defs");
+  const grad = defs.append("linearGradient").attr("id","trendGrad").attr("x1","0").attr("x2","0").attr("y1","0").attr("y2","1");
+  grad.append("stop").attr("offset","0%").attr("stop-color","#e8472a").attr("stop-opacity",0.3);
+  grad.append("stop").attr("offset","100%").attr("stop-color","#e8472a").attr("stop-opacity",0);
+
+  const area = d3.area().x(d => xScale(d.yr)).y0(iH).y1(d => yScale(d.rate)).curve(d3.curveCatmullRom);
+  g.append("path").datum(trendData).attr("d", area).attr("fill","url(#trendGrad)").attr("transform",`translate(0,0)`);
+  g.append("path").datum(trendData).attr("d", line).attr("fill","none").attr("stroke","#e8472a").attr("stroke-width",2.5);
+
+  // Annotation
+  g.append("text").attr("x",xScale(1990)+4).attr("y",yScale(54)-8)
+    .attr("fill","#f5a623").attr("font-size",10).attr("font-family","'DM Mono',monospace")
+    .text("← Screening expansion begins");
+}
+
+// ── EARLY ONSET CHART ────────────────────────────────────────────────────────
+function renderEarlyOnset() {
+  const el = document.getElementById("early-onset-chart");
+  if (!el) return;
+  const W = el.parentElement.clientWidth - 56;
+  el.setAttribute("width", W);
+  const H = 220, pad = { t: 16, r: 20, b: 36, l: 50 };
+  const iW = W - pad.l - pad.r, iH = H - pad.t - pad.b;
+
+  const xScale = d3.scaleLinear().domain([1995, 2022]).range([0, iW]);
+  const yScale = d3.scaleLinear().domain([7, 18]).range([iH, 0]);
+  const line = d3.line().x(d => xScale(d.yr)).y(d => yScale(d.rate)).curve(d3.curveCatmullRom);
+
+  const svg2 = d3.select(el);
+  const g = svg2.append("g").attr("transform", `translate(${pad.l},${pad.t})`);
+
+  [8,10,12,14,16].forEach(v => {
+    g.append("line").attr("x1",0).attr("x2",iW).attr("y1",yScale(v)).attr("y2",yScale(v))
+      .attr("stroke","#1e2530");
+    g.append("text").attr("x",-8).attr("y",yScale(v)+4).attr("fill","#3a3f4a")
+      .attr("font-size",10).attr("text-anchor","end").attr("font-family","'DM Mono',monospace").text(v);
+  });
+
+  [2000,2005,2010,2015,2020].forEach(yr => {
+    g.append("text").attr("x",xScale(yr)).attr("y",iH+18).attr("fill","#3a3f4a")
+      .attr("font-size",10).attr("text-anchor","middle").attr("font-family","'DM Mono',monospace").text(yr);
+  });
+
+  const defs = svg2.append("defs");
+  const grad = defs.append("linearGradient").attr("id","eoGrad").attr("x1","0").attr("x2","0").attr("y1","0").attr("y2","1");
+  grad.append("stop").attr("offset","0%").attr("stop-color","#7ed4a4").attr("stop-opacity",0.3);
+  grad.append("stop").attr("offset","100%").attr("stop-color","#7ed4a4").attr("stop-opacity",0);
+
+  const area = d3.area().x(d => xScale(d.yr)).y0(iH).y1(d => yScale(d.rate)).curve(d3.curveCatmullRom);
+  g.append("path").datum(earlyOnsetData).attr("d", area).attr("fill","url(#eoGrad)");
+  g.append("path").datum(earlyOnsetData).attr("d", line).attr("fill","none").attr("stroke","#7ed4a4").attr("stroke-width",2.5);
+
+  g.append("text").attr("x",xScale(2015)).attr("y",yScale(14.5)-10)
+    .attr("fill","#f5a623").attr("font-size",10).attr("font-family","'DM Mono',monospace")
+    .text("+85% since 1995 ↑");
+}
+
+// ── TABS ─────────────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelector(`.tab[onclick="switchTab('${name}')"]`).classList.add('active');
+  document.getElementById(`panel-${name}`).classList.add('active');
+
+  if (name === 'demographics') renderDemographics();
+  if (name === 'trends') renderTrends();
+  if (name === 'screening') renderScreening();
+}
+
+function renderDemographics() {
+  renderBars("race-bars", raceData, 50);
+  renderBars("sex-bars", sexData, 50);
+  renderBars("geo-bars", geoData, 52);
+  renderAgeChart();
+  renderDonut();
+}
+
+function renderTrends() {
+  renderTrendChart();
+  renderEarlyOnset();
+  renderBars("survival-bars", survivalData, 75);
+}
+
+function renderScreening() {
+  renderBars("screening-bars", screeningUptake, 80);
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+function tryInit() {
+  if (typeof d3 !== 'undefined' && document.getElementById('knowledge-svg')) {
+    initKnowledgeMap();
+  } else {
+    setTimeout(tryInit, 100);
+  }
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => setTimeout(tryInit, 50));
+} else {
+  setTimeout(tryInit, 50);
+}
+</script>
+</body>
+</html>
